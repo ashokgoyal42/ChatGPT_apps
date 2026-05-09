@@ -1,1 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Golf Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial;
+      background: #f4f4f4;
+      padding: 20px;
+      margin: 0;
+    }
 
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      background: black;
+      color: white;
+      font-size: 16px;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    input {
+      width: 100%;
+      padding: 15px;
+      margin-top: 10px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    .score {
+      font-size: 50px;
+      text-align: center;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Golf GPS Tracker</h1>
+  <p>Hole Score</p>
+
+  <div class="score" id="score">0</div>
+
+  <button onclick="addScore()">+ Stroke</button>
+  <button onclick="minusScore()">- Stroke</button>
+
+  <input id="notes" placeholder="Hole notes">
+
+  <button onclick="getLocation()">Get GPS Location</button>
+
+  <p id="gps">GPS not loaded</p>
+</div>
+
+<script>
+let score = 0;
+
+function addScore() {
+  score++;
+  document.getElementById('score').innerText = score;
+}
+
+function minusScore() {
+  if(score > 0){
+    score--;
+  }
+  document.getElementById('score').innerText = score;
+}
+
+function getLocation() {
+  navigator.geolocation.getCurrentPosition(
+    function(position) {
+      document.getElementById('gps').innerText =
+        "Lat: " +
+        position.coords.latitude +
+        " | Long: " +
+        position.coords.longitude;
+    },
+    function() {
+      alert("GPS failed");
+    }
+  );
+}
+</script>
+
+</body>
+</html>
