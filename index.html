@@ -1,102 +1,234 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Golf Tracker</title>
+  <title>Lodhi Golf Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: Arial;
-      background: #f4f4f4;
-      padding: 20px;
-      margin: 0;
+    body { font-family: Arial; background:#f4f4f4; margin:0; padding:18px; }
+    .card { background:white; padding:20px; border-radius:18px; margin-bottom:16px; }
+    h1 { margin-top:0; font-size:32px; }
+    select, input, button {
+      width:100%; padding:15px; margin-top:10px; border-radius:12px;
+      font-size:18px; box-sizing:border-box;
     }
-
-    .card {
-      background: white;
-      padding: 20px;
-      border-radius: 15px;
-      margin-bottom: 20px;
-    }
-
-    button {
-      padding: 15px;
-      border: none;
-      border-radius: 10px;
-      background: black;
-      color: white;
-      font-size: 16px;
-      width: 100%;
-      margin-top: 10px;
-    }
-
-    input {
-      width: 100%;
-      padding: 15px;
-      margin-top: 10px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      font-size: 16px;
-      box-sizing: border-box;
-    }
-
-    h1 {
-      margin-top: 0;
-    }
-
-    .score {
-      font-size: 50px;
-      text-align: center;
-      font-weight: bold;
-    }
+    button { background:black; color:white; border:none; }
+    .score { font-size:55px; text-align:center; font-weight:bold; }
+    .row { display:flex; gap:10px; }
+    .row button { width:50%; }
+    .small { color:#666; font-size:14px; }
+    .holeBox { border-bottom:1px solid #ddd; padding:10px 0; }
   </style>
 </head>
+
 <body>
 
 <div class="card">
-  <h1>Golf GPS Tracker</h1>
-  <p>Hole Score</p>
+  <h1>Lodhi Course Tracker</h1>
+
+  <label>Hole playing</label>
+  <select id="holeSelect" onchange="changeHole()"></select>
+
+  <p id="holeInfo"></p>
 
   <div class="score" id="score">0</div>
 
-  <button onclick="addScore()">+ Stroke</button>
-  <button onclick="minusScore()">- Stroke</button>
+  <div class="row">
+    <button onclick="minusScore()">- Stroke</button>
+    <button onclick="addScore()">+ Stroke</button>
+  </div>
 
-  <input id="notes" placeholder="Hole notes">
+  <input id="notes" placeholder="Notes for this hole" oninput="saveNotes()">
 
-  <button onclick="getLocation()">Get GPS Location</button>
+  <button onclick="getLocation()">Get My GPS</button>
+  <button onclick="saveCentrePoint()">Save Centre Point For This Hole</button>
 
   <p id="gps">GPS not loaded</p>
+  <p id="savedGps" class="small"></p>
+  <p id="distance" class="small"></p>
+</div>
+
+<div class="card">
+  <h2>Round Summary</h2>
+  <p><b>Total Score:</b> <span id="totalScore">0</span></p>
+  <p><b>To Par:</b> <span id="toPar">0</span></p>
+  <button onclick="resetRound()">Reset Round</button>
+</div>
+
+<div class="card">
+  <h2>Hole Tracker</h2>
+  <div id="tracker"></div>
 </div>
 
 <script>
-let score = 0;
+const holes = [
+  {hole:1, par:5, yards:515},
+  {hole:2, par:4, yards:374},
+  {hole:3, par:4, yards:464},
+  {hole:4, par:4, yards:416},
+  {hole:5, par:3, yards:172},
+  {hole:6, par:4, yards:398},
+  {hole:7, par:3, yards:195},
+  {hole:8, par:5, yards:522},
+  {hole:9, par:4, yards:444},
+  {hole:10, par:4, yards:428},
+  {hole:11, par:4, yards:427},
+  {hole:12, par:3, yards:194},
+  {hole:13, par:4, yards:384},
+  {hole:14, par:5, yards:507},
+  {hole:15, par:4, yards:338},
+  {hole:16, par:4, yards:412},
+  {hole:17, par:3, yards:166},
+  {hole:18, par:5, yards:556}
+];
+
+let currentHole = 1;
+let currentGps = null;
+
+let round = JSON.parse(localStorage.getItem("lodhiRound")) || holes.map(h => ({
+  hole: h.hole,
+  par: h.par,
+  yards: h.yards,
+  score: 0,
+  notes: "",
+  centreGps: null
+}));
+
+function save() {
+  localStorage.setItem("lodhiRound", JSON.stringify(round));
+}
+
+function loadDropdown() {
+  const select = document.getElementById("holeSelect");
+  holes.forEach(h => {
+    const option = document.createElement("option");
+    option.value = h.hole;
+    option.text = "Hole " + h.hole + " - Par " + h.par + " - " + h.yards + "y";
+    select.appendChild(option);
+  });
+}
+
+function changeHole() {
+  currentHole = Number(document.getElementById("holeSelect").value);
+  refresh();
+}
 
 function addScore() {
-  score++;
-  document.getElementById('score').innerText = score;
+  round[currentHole - 1].score++;
+  save();
+  refresh();
 }
 
 function minusScore() {
-  if(score > 0){
-    score--;
+  if (round[currentHole - 1].score > 0) {
+    round[currentHole - 1].score--;
   }
-  document.getElementById('score').innerText = score;
+  save();
+  refresh();
+}
+
+function saveNotes() {
+  round[currentHole - 1].notes = document.getElementById("notes").value;
+  save();
 }
 
 function getLocation() {
   navigator.geolocation.getCurrentPosition(
-    function(position) {
-      document.getElementById('gps').innerText =
-        "Lat: " +
-        position.coords.latitude +
-        " | Long: " +
-        position.coords.longitude;
+    pos => {
+      currentGps = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      };
+
+      document.getElementById("gps").innerText =
+        "Current GPS: " + currentGps.lat.toFixed(6) + ", " + currentGps.lng.toFixed(6);
+
+      refresh();
     },
-    function() {
-      alert("GPS failed");
-    }
+    () => alert("GPS failed. Check Safari location permission."),
+    { enableHighAccuracy:true }
   );
 }
+
+function saveCentrePoint() {
+  if (!currentGps) {
+    alert("Press Get My GPS first.");
+    return;
+  }
+
+  round[currentHole - 1].centreGps = currentGps;
+  save();
+  refresh();
+}
+
+function distanceYards(a, b) {
+  if (!a || !b) return null;
+
+  const R = 6371000;
+  const toRad = x => x * Math.PI / 180;
+
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+  const meters = R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return Math.round(meters * 1.09361);
+}
+
+function resetRound() {
+  if (!confirm("Reset this round?")) return;
+  localStorage.removeItem("lodhiRound");
+  location.reload();
+}
+
+function refresh() {
+  const h = round[currentHole - 1];
+
+  document.getElementById("holeInfo").innerText =
+    "Par " + h.par + " • " + h.yards + " yards";
+
+  document.getElementById("score").innerText = h.score;
+  document.getElementById("notes").value = h.notes || "";
+
+  document.getElementById("savedGps").innerText = h.centreGps
+    ? "Saved centre point: " + h.centreGps.lat.toFixed(6) + ", " + h.centreGps.lng.toFixed(6)
+    : "No saved centre point for this hole yet.";
+
+  const yardsAway = distanceYards(currentGps, h.centreGps);
+
+  document.getElementById("distance").innerText =
+    yardsAway ? "Distance to saved centre: " + yardsAway + " yards" : "";
+
+  const total = round.reduce((sum, x) => sum + x.score, 0);
+  const playedPar = round.filter(x => x.score > 0).reduce((sum, x) => sum + x.par, 0);
+  const toPar = total - playedPar;
+
+  document.getElementById("totalScore").innerText = total;
+  document.getElementById("toPar").innerText = toPar >= 0 ? "+" + toPar : toPar;
+
+  const tracker = document.getElementById("tracker");
+  tracker.innerHTML = "";
+
+  round.forEach(x => {
+    const div = document.createElement("div");
+    div.className = "holeBox";
+    div.innerHTML =
+      "<b>Hole " + x.hole + "</b> | Par " + x.par +
+      " | " + x.yards + "y" +
+      " | Score: " + x.score +
+      " | GPS: " + (x.centreGps ? "Saved" : "Not saved");
+    tracker.appendChild(div);
+  });
+}
+
+loadDropdown();
+refresh();
 </script>
 
 </body>
